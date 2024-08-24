@@ -17,7 +17,7 @@ function Payment() {
     const [processing, setProcessing] = useState('');
     const [error, setError] = useState(null);
     const [disabled, setDisabled] = useState(true);
-    const [clientSecret, setClientSecret] = useState(true);   //clientSecret: This is a key provided by Stripe that allows you to securely complete the payment.
+    const [clientSecret, setClientSecret] = useState('');   //clientSecret: This is a key provided by Stripe that allows you to securely complete the payment.
 
 
 
@@ -31,11 +31,21 @@ function Payment() {
                  Once the server responds with the clientSecret, it is stored in the clientSecret state using setClientSecret.
         */
         const getClientSecret = async () => {
-            const response = await axios({
-                method: 'post',
-                url: `/payments/create?total=${getBasketTotal(basket) * 100}`
-            })
-            setClientSecret(response.data.clientSecret)
+            // const response = await axios({
+            //     method: 'post',
+            //     url: `/payments/create?total=${getBasketTotal(basket) * 100}`
+            // })
+            // setClientSecret(response.data.clientSecret)
+            try {
+                const response = await axios({
+                    method: 'post',
+                    url: `/payments/create?total=${getBasketTotal(basket) * 100}`
+                });
+                setClientSecret(response.data.clientSecret);
+            } catch (error) {
+                console.error('Error fetching client secret:', error.response ? error.response.data : error.message);
+                setError('Unable to fetch client secret. Please try again later.');
+            }
         }
         getClientSecret();
 
@@ -47,29 +57,29 @@ function Payment() {
     console.log("User ID:", user?.uid);
     // console.log("Payment Intent ID:", paymentIntent?.id);
 
-
     const handleSubmit = async (e) => {
         e.preventDefault();
         setProcessing(true);
 
-        /*
-          * This line interacts with Stripe's API to confirm the payment using the clientSecret and the card details entered by the user in the CardElement.
-          *  clientSecret is a key that allows your app to securely complete the payment process. It's generated on the server and sent to the client.
-          *  elements.getElement(CardElement) retrieves the card details that the user entered into the form.
-        */
-        const payload = await stripe.confirmCardPayment(clientSecret, {
-            payment_method: {
-                card: elements.getElement(CardElement)
-            }
-        }).then(({ paymentIntent }) => {
+        if (!clientSecret) {
+            console.error('Client secret is missing.');
+            setError('Client secret is missing. Please try again later.');
+            setProcessing(false);
+            return;
+        }
+
+        try {
+            const { paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+                payment_method: {
+                    card: elements.getElement(CardElement)
+                }
+            });
+
             if (!user) {
-                console.error("User is not logged in.");
-                setError("You must be logged in to complete the payment.");
-                setProcessing(false);
-                return;
+                throw new Error("You must be logged in to complete the payment.");
             }
-            db
-                .collection('users')
+
+            await db.collection('users')
                 .doc(user?.uid)
                 .collection('orders')
                 .doc(paymentIntent.id)
@@ -77,23 +87,66 @@ function Payment() {
                     basket: basket,
                     amount: paymentIntent.amount,
                     created: paymentIntent.created
-                })
+                });
+
             setSucceeded(true);
-            setError(null)
-            setProcessing(false)
-
-            dispatch({
-                type: 'EMPTY_BASKET'
-            })
-
+            setError(null);
+            dispatch({ type: 'EMPTY_BASKET' });
             navigate('/orders', { replace: true });
-        }).catch(error => {
+        } catch (error) {
+            console.error('Payment error:', error.message);
             setError(`Payment failed: ${error.message}`);
+        } finally {
             setProcessing(false);
-        });
+        }
+    };
+
+    // const handleSubmit = async (e) => {
+    //     e.preventDefault();
+    //     setProcessing(true);
+
+    //     /*
+    //       * This line interacts with Stripe's API to confirm the payment using the clientSecret and the card details entered by the user in the CardElement.
+    //       *  clientSecret is a key that allows your app to securely complete the payment process. It's generated on the server and sent to the client.
+    //       *  elements.getElement(CardElement) retrieves the card details that the user entered into the form.
+    //     */
+    //     const payload = await stripe.confirmCardPayment(clientSecret, {
+    //         payment_method: {
+    //             card: elements.getElement(CardElement)
+    //         }
+    //     }).then(({ paymentIntent }) => {
+    //         if (!user) {
+    //             console.error("User is not logged in.");
+    //             setError("You must be logged in to complete the payment.");
+    //             setProcessing(false);
+    //             return;
+    //         }
+    //         db
+    //             .collection('users')
+    //             .doc(user?.uid)
+    //             .collection('orders')
+    //             .doc(paymentIntent.id)
+    //             .set({
+    //                 basket: basket,
+    //                 amount: paymentIntent.amount,
+    //                 created: paymentIntent.created
+    //             })
+    //         setSucceeded(true);
+    //         setError(null)
+    //         setProcessing(false)
+
+    //         dispatch({
+    //             type: 'EMPTY_BASKET'
+    //         })
+
+    //         navigate('/orders', { replace: true });
+    //     }).catch(error => {
+    //         setError(`Payment failed: ${error.message}`);
+    //         setProcessing(false);
+    //     });
 
 
-    }
+    // }
     const handleChange = e => {
         setDisabled(e.empty);
         setError(e.error ? e.error.message : "")

@@ -11,11 +11,9 @@ const functions = require("firebase-functions");
 const express = require("express");
 const cors = require("cors");
 
-const stripe = require("stripe")(
-    `sk_test_51Pnbu0P5oy2mnKJKrIP8CpeKOSt49PFh
-    12grS3HF9p4KkQ33jUns9MTdz35vWuNHL6NA8FC7mh1VA3Fhy0DddrQl002zPXlrDE`,
-);
-
+const stripe = require("stripe")(`sk_test_51Pnbu0P5oy2mnKJKrIP8CpeKOSt49PFh12grS3HF9p4KkQ33jUns9MTdz35vWuNHL6NA8FC7mh1VA3Fhy0DddrQl002zPXlrDE`);
+// `sk_test_51Pnbu0P5oy2mnKJKrIP8CpeKOSt49PFh
+//  12grS3HF9p4KkQ33jUns9MTdz35vWuNHL6NA8FC7mh1VA3Fhy0DddrQl002zPXlrDE`
 // App configuration
 const app = express();
 
